@@ -13,74 +13,7 @@ from ultralytics import YOLO
 import cv2
 from PIL import Image, ImageFont, ImageDraw
 import numpy as np
-
-# 2024.03.15 질문등록 question_create() 함수 추가
-@login_required(login_url='common:login') # 2024.03.19 질문등록하려면 login 먼저하라고!
-def question_create(request):
-    """
-    crowds 질문 등록
-    """
-    if request.method == 'POST':
-        form = QuestionForm(request.POST)
-        if form.is_valid():
-            question = form.save(commit=False) # create_date가 지정될 때까지 임시저장
-            question.upload_image = request.FILES['upload_image']
-            question.author = request.user # 추가한 속성 author 적용. 2024.03.19 
-            question.create_date = timezone.now()
-            question.save()
-
-            # ======= YOLOv8 predict() 후에 답변을 자동 생성할까? ========== 
-            yolo_predict(question)       
-            
-            # 답변 자동 생성 하기
-            answer_create(request, question.id, question.upload_image,  )   
-
-            return redirect('crowds:index')
-    else :
-        form = QuestionForm()
-    context = {'form': form}
-    return render(request, 'crowds/question_form.html', context)
-
-# 2024.03.19 질문수정함수 추가
-@login_required(login_url='common:login') 
-def question_modify(request, question_id):
-    """
-    crowds 질문 수정
-    """
-    question = get_object_or_404(Question, pk=question_id)
-    # 로그인한 사용자(request.user)와 글쓴이(question.author)가 다르면 수정권한없음
-    if request.user != question.author: 
-        messages.error(request, '수정권한이 없습니다')
-        return redirect('crowds:detail', question_id=question.id)
-    
-    if request.method == 'POST':
-        form = QuestionForm(request.POST, instance=question)
-        if form.is_valid():
-            question = form.save(commit=False) # create_date가 지정될 때까지 임시저장
-            question.author = request.user 
-            question.modify_date = timezone.now() # 수정일시 저장
-            question.save()
-            return redirect('crowds:detail', question_id=question.id)
-    else :
-        form = QuestionForm(instance=question)
-    context = {'form': form}
-    return render(request, 'crowds/question_form.html', context)
-
-# 2024.03.19 질문삭제함수 추가
-@login_required(login_url='common:login') 
-def question_delete(request, question_id):
-    """
-    crowds 질문 삭제
-    """
-    question = get_object_or_404(Question, pk=question_id)
-    # 로그인한 사용자(request.user)와 글쓴이(question.author)가 다르면 삭제권한없음
-    if request.user != question.author: 
-        messages.error(request, '삭제권한이 없습니다')
-        return redirect('crowds:detail', question_id=question.id)
-    
-    question.delete()
-    return redirect('crowds:index')
-
+from datetime import datetime
 
 # ============== YOLOv8 predict 관련 함수 start ==========================
 
@@ -135,14 +68,15 @@ def plot_counter1(img, text1): # text 1 줄만 넣기
 
 # 추론/예측 함수
 
-def yolo_predict(question):
-    image_dir = './media/'
-    # image_dir = "C:/projects/crowds/media/"
-    out_dir = os.path.join(image_dir, "predict_images")
-    source_image = os.path.join(image_dir, str(question.upload_image.name))
-    predict_file = 'pred_' + os.path.split(source_image)[1]
-    out_file = os.path.join(out_dir, predict_file) 
-    
+def yolo_predict(filename, user):
+
+    source_path = './media/' + str(filename) # 경로 포함 파일이름
+    predict_dir = './media/answer/'
+    source_file = os.path.split(source_path)[1] # 순수 파일이름만
+    predict_file = timezone.now().strftime("%Y%m%d%H%M")
+    out_file = predict_dir + predict_file + '/' + source_file
+    predict_image_url = 'answer/' + predict_file + '/' + source_file
+
     choice = False
     
     if choice : # YOLOv8 original 모델 그대로 사용
@@ -154,9 +88,9 @@ def yolo_predict(question):
         yolo_model = YOLO(pretrained_model) # 전이학습용
     
     # predict 예측/추론하기
-    results = yolo_model.predict(source=source_image, conf=0.30,
-                                 name=out_dir, save=True, exist_ok=True,
-                                 seed=0, show_conf=False)
+    results = yolo_model.predict(source=source_path, conf=0.30,save=True,
+                                 project=predict_dir, name=predict_file, 
+                                 exist_ok=True, seed=0, show_conf=False)
     
     # object detection 결과 : person, 전체 건수 계산
     person_count,total_counts = count_objects(results, yolo_model.names)
@@ -167,4 +101,77 @@ def yolo_predict(question):
     plot_counter1(cv2_image, out_text1)
     cv2.imwrite(out_file, cv2_image)
     
+    result_mesg = f'YOLOv8 분석 내용 : [{person_count}] 명'
+    return result_mesg, predict_image_url
+
 # ============== YOLOv8 predict 관련 함수 end ==========================
+
+# 2024.03.15 질문등록 question_create() 함수 추가
+@login_required(login_url='common:login') # 2024.03.19 질문등록하려면 login 먼저하라고!
+def question_create(request):
+    """
+    crowds 질문 등록
+    """
+    if request.method == 'POST':
+        form = QuestionForm(request.POST)
+        if form.is_valid():
+            question = form.save(commit=False) # create_date가 지정될 때까지 임시저장
+            question.upload_image = request.FILES['upload_image']
+            question.author = request.user # 추가한 속성 author 적용. 2024.03.19 
+            question.create_date = timezone.now()
+            question.save()
+            
+            # ======= YOLOv8 predict() 후에 답변을 자동 생성할까? ========== 
+           
+            # if (question.upload_image.size > 0) : # 파일이 정상적으로 업로드 되었는 지
+            # 혼잡도 분석하기 
+            result_mesg, out_file = yolo_predict(question.upload_image,request.user)       
+            
+            # 답변 자동 생성 하기
+            answer_create(request, question.id, result_mesg, out_file)
+            
+            return redirect('crowds:index')
+    else :
+        form = QuestionForm()
+    context = {'form': form}
+    return render(request, 'crowds/question_form.html', context)
+
+# 2024.03.19 질문수정함수 추가
+@login_required(login_url='common:login') 
+def question_modify(request, question_id):
+    """
+    crowds 질문 수정
+    """
+    question = get_object_or_404(Question, pk=question_id)
+    # 로그인한 사용자(request.user)와 글쓴이(question.author)가 다르면 수정권한없음
+    if request.user != question.author: 
+        messages.error(request, '수정권한이 없습니다')
+        return redirect('crowds:detail', question_id=question.id)
+    
+    if request.method == 'POST':
+        form = QuestionForm(request.POST, instance=question)
+        if form.is_valid():
+            question = form.save(commit=False) # create_date가 지정될 때까지 임시저장
+            question.author = request.user 
+            question.modify_date = timezone.now() # 수정일시 저장
+            question.save()
+            return redirect('crowds:detail', question_id=question.id)
+    else :
+        form = QuestionForm(instance=question)
+    context = {'form': form}
+    return render(request, 'crowds/question_form.html', context)
+
+# 2024.03.19 질문삭제함수 추가
+@login_required(login_url='common:login') 
+def question_delete(request, question_id):
+    """
+    crowds 질문 삭제
+    """
+    question = get_object_or_404(Question, pk=question_id)
+    # 로그인한 사용자(request.user)와 글쓴이(question.author)가 다르면 삭제권한없음
+    if request.user != question.author: 
+        messages.error(request, '삭제권한이 없습니다')
+        return redirect('crowds:detail', question_id=question.id)
+    
+    question.delete()
+    return redirect('crowds:index')

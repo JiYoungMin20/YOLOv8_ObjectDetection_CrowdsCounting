@@ -11,7 +11,7 @@
             {% endfor %}
         </div>
     {% endif %}
-    <h4 class="border-bottom py-2">{{ question.subject }}</h4> <!-- 재목 -->
+    <h5 class="border-bottom py-2">{{ question.subject }}</h5> <!-- 재목 -->
     <!-- 질문 추천 버튼 만들기 -->
     <div class="row my-3">
         <div class="col-1"> <!-- 추천 영역 -->
@@ -26,6 +26,23 @@
             <div class="card"> <!-- my-3 삭제 -->
                 <div class="card-body">
                     <div class="card-text">{{ question.content|mark }}</div> <!-- markdown 적용 -->
+                    
+                    <!-- 제보이미지 보여주기 start -->
+                    <div>
+                    {% if question.upload_image %}
+                        <div class="container border col-10">
+                            <div style="width:10%; height:150px; float:left; margin-right:10px;">
+                                <img src="{{ question.upload_image.url }}" width="250">
+                            </div>
+                        </div>
+                    {% endif %}
+                    </div>
+                    <!-- 제보이미지 보여주기 end -->
+
+                    <br></br>
+                    <p></p>
+                    <br></br>
+
                     <div class="d-flex justify-content-end">
                         <!-- 질문 수정일시 추가 -->
                         {% if question.modify_date %}
@@ -82,20 +99,12 @@
             </div>
             <!-- 기존 내용 end -->
             
-            <!-- 제보이미지 보여주기 start -->
-            {% if question.upload_image %}
-                <div class="container border col-10">
-                    <div style="width:10%; height:150px; float:left; margin-right:10px;">
-                        <img src="{{ question.upload_image.url }}" width="200">
-                    </div>
-                </div>
-            {% endif %}
-            <!-- 제보이미지 보여주기 end -->
             </div>
         </div>
-
+    <!-- 잠시 주석처리 2024.03.09 ==================
     <h5 class="border-bottom my-3 py-2">
         {{ question.answer_set.count }}개의 답변이 있습니다.
+    ================== -->
     </h5>
     {% for answer in question.answer_set.all %}
     <a name="answer_{{ answer.id }}"></a> <!-- 앵커 엘리먼트 추가 -->
@@ -118,6 +127,22 @@
                         {{ answer.content }}</div>
                     -->
                     <div class="card-text">{{ answer.content|mark }}</div> <!-- markdown 적용 -->
+
+                    <!-- 분석이미지 보여주기 start -->
+                    <div>
+                        {% if answer.predicted_image %}
+                            <div class="container border col-10">
+                                <div style="width:10%; height:150px; float:left; margin-right:10px;">
+                                    <img src="{{ answer.predicted_image.url }}" width="250">
+                                </div>
+                            </div>
+                        {% endif %}
+                        </div>
+                    <!-- 분석이미지 보여주기 end -->
+
+                    <br></br>
+                    <p></p>
+                    <br></br>
 
                     <div class="d-flex justify-content-end">
                         <!-- 답변 수정일시 추가 -->
@@ -190,7 +215,7 @@
                 {% endfor %}
             </div>
         {% endif %}
-        <!-- 2024.03.09 로그아웃상태에서 아예 답글을 작성할 수 업게 막기 -->
+        <!-- 2024.03.09 로그아웃상태에서 아예 답글을 작성할 수 없게 막자 -->
         <div class="form-group">
             <textarea {% if not user.is_authenticated %}disabled{% endif %}
               name="content" id="content" class="form-control" rows="4"></textarea>

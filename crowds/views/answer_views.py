@@ -10,7 +10,7 @@ from ..models import Question, Answer
 # 2014.03.14 답변등록 answer_create() 함수 추가
 # 2014.03.15 답변등록 answer_create() 함수 수정 : POST, GET으로 분리
 @login_required(login_url='common:login') # 2024.03.19 답변등록하려면 login 먼저하라고!
-def answer_create(request, question_id):
+def answer_create(request, question_id, result_mesg, out_file):
     """
     crowds 답변 등록
     """
@@ -21,6 +21,8 @@ def answer_create(request, question_id):
         form = AnswerForm(request.POST)
         if form.is_valid():
             answer = form.save(commit=False) # create_date가 지정될 때까지 임시저장
+            answer.content = result_mesg # 분석 결과 
+            answer.predicted_image = out_file # 경로포함 전체 파일명
             answer.author = request.user # 추가한 속성 author 적용. 2024.03.19 
             answer.create_date = timezone.now()
             answer.question = question
