@@ -5,8 +5,6 @@
     <h5 class="my-3 border-bottom pb-2">혼잡지역 제보이미지 등록</h5>
     <form method="post" class="post-form my-3" enctype="multipart/form-data">
         {% csrf_token %}
-        <!-- 수작업으로 폼 작성하는 것으로 변경
-        {{ form.as_p }} -->
 
         <!-- 오류 표시 Start -->
         {% if form.errors %}
